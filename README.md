@@ -9,9 +9,11 @@ is its estimated market price, and how confident is that estimate?"*
 
 ## Live demo
 
-- 🏠 **Valuation tool (Streamlit):** https://house-price-analytics-tjpb7ntxsd6kzbapp7bymmv.streamlit.app/
-- 📈 **Monitoring dashboard:** second page of the same Streamlit app (sidebar) — the 2010 drift replay with all four retraining triggers, rendered from committed monitoring artifacts
+- 🏠 **Valuation + monitoring (Streamlit):** https://house-price-analyticsgit-o5btajapatusvnfdndcsd6.streamlit.app/
+- 📈 **Monitoring dashboard:** second page of the same app (sidebar) — live rolling RMSE/MAE on the 2010 stream plus walk-forward retrain simulation
 - 🔌 **Prediction API (FastAPI):** run locally with `uvicorn app.api.main:app` → interactive docs at http://localhost:8000/docs (same model, same serving code as the live tool)
+
+**Cloud Python version:** Community Cloud ignores `runtime.txt`. When (re)deploying, open **Advanced settings** and choose **Python 3.11** (or 3.12). If the app was created on 3.14, delete it and redeploy with 3.11 selected — reboot alone cannot change Python.
 
 ## Team
 

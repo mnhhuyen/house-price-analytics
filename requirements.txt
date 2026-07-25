@@ -4,12 +4,15 @@
 #
 # Full development environment (EDA, monitoring, API, tests): requirements-dev.txt
 #
-# numpy is pinned <2 because evidently 0.4.x (dev/monitoring) is not compatible
-# with numpy 2 — one consistent version across dev and deploy.
+# Do NOT pin numpy to 1.26 here. Community Cloud currently often builds with
+# Python 3.14, which has no numpy==1.26 wheels; a failed numpy install then
+# leaves joblib/sklearn missing and the app crashes on import. Flexible lower
+# bounds let the resolver pick wheels that exist for the Cloud Python version.
+# (evidently still needs numpy<2 in the *dev* environment only.)
 
-numpy==1.26.4
-pandas==2.2.3
-scikit-learn==1.5.2
-lightgbm==4.5.0
-joblib==1.4.2
-streamlit==1.40.2
+numpy>=1.26.4
+pandas>=2.2.3
+scikit-learn>=1.5.2
+lightgbm>=4.5.0
+joblib>=1.4.2
+streamlit>=1.40.2
