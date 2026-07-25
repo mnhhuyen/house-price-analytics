@@ -21,7 +21,15 @@ from pathlib import Path
 import pandas as pd
 import streamlit as st
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+# Streamlit Cloud clones into /mount/src/<repo>. If /mount is on sys.path,
+# `import src` resolves to the mount folder, not this project's package.
+_ROOT = Path(__file__).resolve().parent.parent
+_SHADOW = {"/mount", "/mount/src"}
+sys.path[:] = [
+    p for p in sys.path
+    if str(Path(p).resolve()) not in _SHADOW
+]
+sys.path.insert(0, str(_ROOT))
 
 from src.config import (BIAS_ALERT_PCT, COVERAGE_ALERT, DRIFT_SHARE_ALERT,
                         MODELS_DIR, MONITORING_REPORTS_DIR, RMSE_ALERT_RATIO,
