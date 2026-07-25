@@ -71,10 +71,11 @@ bolting intervals on at deployment time (untestable, indefensible).
 
 ## D6. Synthetic data carries a real time axis, designed up front
 
-**Choice:** Generated data includes a monthly `listing_date` spanning 55
-months (Jan 2006 – Jul 2010; see D11 for how it's anchored) with realistic
+**Choice:** Generated data includes a `sale_date` anchored to 55 real Ames
+sale months plus a derived `listing_date = sale_date - days_on_market`, with
+realistic
 drift baked in (price-index trend, shifting days-on-market, a local
-interest-rate series). All 2010 listings are held out as the "incoming stream"
+interest-rate series). All 2010 sales are held out as the "incoming stream"
 and never used in training.
 **Why:** The Kaggle Ames data is a static snapshot, but Module 7 requires
 detecting drift "as new sales data arrives." Without a time axis designed into
@@ -119,9 +120,10 @@ generate ourselves *are* committed for reproducibility.
 
 ## D11. Time axis anchored to the real Ames sale dates
 
-**Choice:** `listing_date` is built from the dataset's own `YrSold`/`MoSold`
-columns (Jan 2006 – Jul 2010, 55 months) rather than invented dates. All 2010
-sales (175 homes) form the monitoring holdout stream.
+**Choice:** `sale_date` uses the dataset's own `YrSold`/`MoSold` columns
+(Jan 2006 – Jul 2010) plus a seeded day. `listing_date` is then derived by
+subtracting `days_on_market`. All 2010 sales (175 homes) form the monitoring
+holdout stream.
 **Why:** The brief requires a time dimension for monitoring; the honest way to
 get one is to use the temporal information the data already contains — no row
 is ever internally inconsistent (e.g. "listed" a decade after it sold). The
@@ -134,9 +136,11 @@ financial crisis) instead of an arbitrary trend.
 
 **Choice:** The synthetic market price index falls ~10% through 2008–09, then
 rebounds ~9.5% during 2010 — entirely inside the monitoring stream (initially
-+5%; strengthened for detectability — see D17). The modeling
-target `sale_price` is the Kaggle price re-expressed under this index
-(original preserved in `sale_price_kaggle`).
++5%; strengthened for detectability — see D17). The primary modeling target
+`sale_price` remains the original Kaggle label. A separate
+`sale_price_market_adjusted` label re-expresses it under the synthetic index
+relative to 2010-01 and is used only to replay the monitoring scenario;
+before 2010 it is exactly equal to the original target.
 **Why:** Module 7 must demonstrate *detectable* drift. A model trained on
 2006–09 has never seen a rebound, so it under-predicts 2010 progressively —
 rolling error rises for an explainable business reason ("the market recovered
@@ -146,14 +150,36 @@ anything in training, and days-on-market shortens.
 
 ## D13. Synthetic realism is enforced by tests, not just claimed
 
-**Choice:** Every property claimed in DATA_DICTIONARY.md (school distance
-correlates negatively with price, transit doesn't, dirt exists only before
-2010, renovation fields agree with the real remodel column, the trend/rebound
-shape, byte-identical regeneration) is encoded as a pytest invariant
-(`tests/test_synthetic_data.py`).
+**Choice:** Every property claimed in DATA_DICTIONARY.md (amenity/DOM
+generation independent of SalePrice, dirt exists only before 2010, renovation
+fields agree with the real remodel column, the trend/rebound shape) is encoded
+as a pytest invariant (`tests/test_synthetic_data.py`).
 **Why:** "Justify the realism of generated features" is an explicit grading
 criterion; a documented claim that can silently rot is worth little. The tests
 make the documentation binding.
+
+## D18. Amenity distances — hybrid of map + priors + Condition/Zoning (no SalePrice)
+
+**Choice:** Combine three generators: (1) seeded fictional 10×10 km map for
+base Euclidean distances; (2) neighborhood access priors from modal MSZoning,
+median LotArea density, and a short hand-crafted urban-form table; (3)
+listing-level Condition1/2 nudges. After cleaning, `amenity_score` 0–100 is
+derived from proximity + Condition + Zoning.
+**Why:** The brief asks for contextual amenity scores with business logic.
+A pure random map is leakage-safe but hard to narrate; price-ranked bases
+leak the target. The hybrid stays leakage-safe while using real Kaggle
+columns (zoning, lot size, proximity codes) and documented urban-form priors.
+**Rejected:** Rank-by-median-SalePrice bases (target contamination).
+`amenity_score` is for EDA only — the model already has the three distances.
+
+## D19. Original SalePrice is the primary target
+
+**Choice:** Train, cross-validate, calibrate and report the model against the
+unmodified Kaggle `SalePrice`. Keep the macro-adjusted price under a separate,
+explicitly named monitoring-scenario column.
+**Why:** Contextual-data generation should not silently redefine ground truth.
+Separating the two labels preserves valid model metrics while still allowing
+Module 7 to demonstrate a designed market-recovery scenario.
 
 ## D14. Deploy the quantile LightGBM even though Ridge wins on CV RMSE
 

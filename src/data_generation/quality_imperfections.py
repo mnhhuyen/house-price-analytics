@@ -31,7 +31,7 @@ def inject_imperfections(listings: pd.DataFrame) -> pd.DataFrame:
     df = listings.copy()
 
     # dirt only before the monitoring stream
-    eligible = df.index[df["listing_date"] < pd.Timestamp(MONITORING_HOLDOUT_START)]
+    eligible = df.index[df["sale_date"] < pd.Timestamp(MONITORING_HOLDOUT_START)]
 
     def _sample(rate_or_n) -> np.ndarray:
         n = rate_or_n if isinstance(rate_or_n, int) else round(len(eligible) * rate_or_n)
@@ -58,7 +58,7 @@ def inject_imperfections(listings: pd.DataFrame) -> pd.DataFrame:
     dup_rows = df.loc[_sample(N_DUPLICATE_LISTINGS)].copy()
     dup_rows["listing_id"] = "L-9" + dup_rows["Id"].astype(str).str.zfill(5)
     dup_rows["listing_date"] += pd.to_timedelta(
-        rng.integers(1, 4, len(dup_rows)), unit="D"
+        rng.integers(1, 3, len(dup_rows)), unit="D"
     )
     df = pd.concat([df, dup_rows], ignore_index=True)
 

@@ -59,6 +59,10 @@ def clean(df: pd.DataFrame) -> tuple[pd.DataFrame, list[dict]]:
     quarter = df["listing_date"].dt.to_period("Q")
     df["days_on_market"] = df["days_on_market"].fillna(
         df.groupby(quarter)["days_on_market"].transform("median")).round()
+    # Keep date arithmetic consistent after replacing the sentinel.
+    df["listing_date"] = (
+        df["sale_date"] - pd.to_timedelta(df["days_on_market"], unit="D")
+    )
     evidence.append(_log("DOM sentinel 999 -> quarter-median impute",
                          n0, (df["days_on_market"] == 999).sum(), "rows"))
 
@@ -109,7 +113,7 @@ def clean(df: pd.DataFrame) -> tuple[pd.DataFrame, list[dict]]:
 
 def main() -> None:
     df = pd.read_csv(DATA_SYNTHETIC_DIR / "ames_extended.csv",
-                     parse_dates=["listing_date"])
+                     parse_dates=["listing_date", "sale_date"])
     n_in = len(df)
     df, _ = clean(df)
 

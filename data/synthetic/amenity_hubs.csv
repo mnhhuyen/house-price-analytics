@@ -1,0 +1,12 @@
+amenity_type,hub_id,x_km,y_km
+school,school-1,4.2,5.901
+school,school-2,1.659,9.257
+school,school-3,6.619,9.894
+school,school-4,6.423,0.871
+hospital,hospital-1,1.48,1.164
+hospital,hospital-2,7.138,6.478
+transit,transit-1,2.162,9.0
+transit,transit-2,0.859,4.281
+transit,transit-3,8.79,9.83
+transit,transit-4,0.628,5.93
+transit,transit-5,7.179,1.45

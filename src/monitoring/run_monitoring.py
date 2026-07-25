@@ -32,18 +32,16 @@ from evidently import ColumnMapping
 from evidently.metric_preset import DataDriftPreset
 from evidently.report import Report
 
-from src.config import MONITORING_REPORTS_DIR, ROOT_DIR
+from src.config import (BIAS_ALERT_PCT, COVERAGE_ALERT, DRIFT_SHARE_ALERT,
+                        MONITORING_REPORTS_DIR, RMSE_ALERT_RATIO, ROOT_DIR,
+                        WINDOW_MONTHS)
 from src.features.build_model_table import (CATEGORICAL_FEATURES,
-                                            NUMERIC_FEATURES, TARGET)
+                                            MONITORING_TARGET,
+                                            NUMERIC_FEATURES)
 from src.modeling.model_inputs import category_levels, encode_for_trees, load_model_table
 from src.modeling.train_final import predict_interval
 from src.modeling.valuation_service import ValuationService
 
-RMSE_ALERT_RATIO = 1.25
-DRIFT_SHARE_ALERT = 0.30
-BIAS_ALERT_PCT = 5.0
-COVERAGE_ALERT = 0.65
-WINDOW_MONTHS = 3
 MIN_DRIFT_SAMPLE = 40  # below this, per-feature drift tests are noise, not signal
 
 # listing_month excluded: the calendar always "drifts"; that is seasonality,
@@ -64,8 +62,8 @@ def main() -> None:
         categorical_features=CATEGORICAL_FEATURES)
     reference = train[DRIFT_COLUMNS]
 
-    stream = stream.sort_values("listing_date")
-    stream["month"] = stream["listing_date"].dt.to_period("M")
+    stream = stream.sort_values("sale_date")
+    stream["month"] = stream["sale_date"].dt.to_period("M")
     months = sorted(stream["month"].unique())
 
     MONITORING_REPORTS_DIR.mkdir(parents=True, exist_ok=True)
@@ -79,7 +77,9 @@ def main() -> None:
         window = stream[(stream["month"] > m - WINDOW_MONTHS) & (stream["month"] <= m)]
         X = encode_for_trees(window, levels)
         iv = predict_interval(models, offset, X)
-        y = window[TARGET].to_numpy()
+        # Performance simulation uses the separate market-adjusted label.
+        # The model itself was trained/evaluated on original Kaggle SalePrice.
+        y = window[MONITORING_TARGET].to_numpy()
 
         rmse = float(np.sqrt(((iv.point.to_numpy() - y) ** 2).mean()))
         bias_pct = float((iv.point.to_numpy() - y).mean() / np.median(y) * 100)
@@ -114,30 +114,34 @@ def main() -> None:
     summary.to_csv(MONITORING_REPORTS_DIR / "monitoring_summary.csv", index=False)
 
     # timeline figure for the report/slides
-    fig, axes = plt.subplots(4, 1, figsize=(9, 9.5), sharex=True)
-    x = summary["month"]
-    axes[0].plot(x, summary["rmse"] / 1000, "o-")
-    axes[0].axhline(baseline_rmse / 1000, ls="--", c="gray", label="training baseline")
-    axes[0].axhline(RMSE_ALERT_RATIO * baseline_rmse / 1000, ls="--", c="red",
-                    label=f"alert ({RMSE_ALERT_RATIO}x)")
-    axes[0].set(ylabel="RMSE ($k)", title=f"Rolling {WINDOW_MONTHS}-mo RMSE on incoming 2010 sales")
-    axes[0].legend(fontsize=8)
-    axes[1].plot(x, summary["bias_pct"], "o-", color="#8172B2")
-    axes[1].axhline(0, c="gray", lw=0.8)
-    for s in (BIAS_ALERT_PCT, -BIAS_ALERT_PCT):
-        axes[1].axhline(s, ls="--", c="red")
-    axes[1].set(ylabel="Mean bias (%)", title="Systematic under/over-prediction "
-                "(negative = model prices below the market)")
-    axes[2].bar(x, summary["drift_share"] * 100, color="#4C72B0")
-    axes[2].axhline(DRIFT_SHARE_ALERT * 100, ls="--", c="red")
-    axes[2].set(ylabel="Drifting features (%)", title="Data drift (Evidently)")
-    axes[3].plot(x, summary["coverage"] * 100, "o-", color="#55A868")
-    axes[3].axhline(80, ls="--", c="gray")
-    axes[3].axhline(COVERAGE_ALERT * 100, ls="--", c="red")
-    axes[3].set(ylabel="Coverage (%)", title="Observed 80%-interval coverage",
-                xlabel="2010 month")
-    fig.tight_layout()
-    fig.savefig(ROOT_DIR / "reports" / "figures" / "09_monitoring_timeline.png", dpi=120)
+    try:
+        fig, axes = plt.subplots(4, 1, figsize=(9, 9.5), sharex=True)
+        x = summary["month"]
+        axes[0].plot(x, summary["rmse"] / 1000, "o-")
+        axes[0].axhline(baseline_rmse / 1000, ls="--", c="gray", label="training baseline")
+        axes[0].axhline(RMSE_ALERT_RATIO * baseline_rmse / 1000, ls="--", c="red",
+                        label=f"alert ({RMSE_ALERT_RATIO}x)")
+        axes[0].set(ylabel="RMSE ($k)", title=f"Rolling {WINDOW_MONTHS}-mo RMSE on incoming 2010 sales")
+        axes[0].legend(fontsize=8)
+        axes[1].plot(x, summary["bias_pct"], "o-", color="#8172B2")
+        axes[1].axhline(0, c="gray", lw=0.8)
+        for s in (BIAS_ALERT_PCT, -BIAS_ALERT_PCT):
+            axes[1].axhline(s, ls="--", c="red")
+        axes[1].set(ylabel="Mean bias (%)", title="Systematic under/over-prediction "
+                    "(negative = model prices below the market)")
+        axes[2].bar(x, summary["drift_share"] * 100, color="#4C72B0")
+        axes[2].axhline(DRIFT_SHARE_ALERT * 100, ls="--", c="red")
+        axes[2].set(ylabel="Drifting features (%)", title="Data drift (Evidently)")
+        axes[3].plot(x, summary["coverage"] * 100, "o-", color="#55A868")
+        axes[3].axhline(80, ls="--", c="gray")
+        axes[3].axhline(COVERAGE_ALERT * 100, ls="--", c="red")
+        axes[3].set(ylabel="Coverage (%)", title="Observed 80%-interval coverage",
+                    xlabel="2010 month")
+        fig.savefig(ROOT_DIR / "reports" / "figures" / "09_monitoring_timeline.png",
+                    dpi=120, bbox_inches="tight")
+        plt.close(fig)
+    except RecursionError:
+        print("warning: monitoring timeline figure skipped (matplotlib RecursionError)")
 
     fired_months = summary[summary["retrain"]]
     print(f"\nretraining recommended in {len(fired_months)}/{len(summary)} months"

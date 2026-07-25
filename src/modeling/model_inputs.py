@@ -16,7 +16,7 @@ ALL_FEATURES = NUMERIC_FEATURES + CATEGORICAL_FEATURES
 def load_model_table() -> tuple[pd.DataFrame, pd.DataFrame]:
     """Return (training window, monitoring stream) from model_table.csv."""
     df = pd.read_csv(DATA_PROCESSED_DIR / "model_table.csv",
-                     parse_dates=["listing_date"])
+                     parse_dates=["listing_date", "sale_date"])
     train = df[df["is_monitoring_stream"] == 0].reset_index(drop=True)
     stream = df[df["is_monitoring_stream"] == 1].reset_index(drop=True)
     return train, stream

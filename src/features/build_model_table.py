@@ -32,6 +32,28 @@ CATEGORICAL_FEATURES = [
     "CentralAir",
 ]
 TARGET = "sale_price"
+MONITORING_TARGET = "sale_price_market_adjusted"
+
+
+def _amenity_score_from_row(df: pd.DataFrame) -> pd.Series:
+    """Recompute amenity_score after cleaning (distances may have been fixed)."""
+    prox = (
+        50.0 / (1.0 + df["dist_school_km"])
+        + 30.0 / (1.0 + df["dist_hospital_km"])
+        + 20.0 / (1.0 + df["dist_transit_km"])
+    )
+    cond1 = df["Condition1"].astype(str)
+    cond2 = df["Condition2"].astype(str)
+    cond_bonus = np.where(cond1.isin({"PosN", "PosA"}) | cond2.isin({"PosN", "PosA"}), 10.0, 0.0)
+    cond_bonus = cond_bonus + np.where(
+        cond1.isin({"Artery", "Feedr"}) | cond2.isin({"Artery", "Feedr"}), 5.0, 0.0
+    )
+    zone_bonus = {
+        "RH": 10, "RM": 8, "FV": 7, "RL": 3, "RP": 3,
+        "C (all)": 5, "C": 5, "A (agr)": 0, "A": 0, "I": 1, "I (all)": 1,
+    }
+    z = df["MSZoning"].astype(str).map(zone_bonus).fillna(0.0).to_numpy()
+    return pd.Series(np.clip(prox + cond_bonus + z, 0, 100).round(1), index=df.index)
 
 
 def engineer_features(df: pd.DataFrame) -> pd.DataFrame:
@@ -44,11 +66,9 @@ def engineer_features(df: pd.DataFrame) -> pd.DataFrame:
     out["is_renovated"] = (out["renovated"] == "Yes").astype(int)
     out["renovation_cost_usd"] = out["renovation_cost_usd"].fillna(0)
     out["listing_month"] = out["listing_date"].dt.month
-    # amenity-proximity score: closer = higher; kept for EDA/report, NOT a
-    # model feature (it is a function of the three distances already included)
-    out["amenity_score"] = (1 / (1 + out["dist_school_km"])
-                            + 0.5 / (1 + out["dist_hospital_km"])
-                            + 0.3 / (1 + out["dist_transit_km"]))
+    # amenity_score: hybrid proximity + Condition + Zoning; EDA only (not in
+    # NUMERIC_FEATURES — collinear with the three distances already modeled)
+    out["amenity_score"] = _amenity_score_from_row(out)
     return out
 
 
@@ -68,7 +88,7 @@ def vif_table(df: pd.DataFrame, cols: list[str]) -> pd.Series:
 
 def main() -> None:
     df = pd.read_csv(DATA_PROCESSED_DIR / "listings_clean.csv",
-                     parse_dates=["listing_date"])
+                     parse_dates=["listing_date", "sale_date"])
     df = engineer_features(df)
 
     vifs = vif_table(df, NUMERIC_FEATURES)
@@ -78,11 +98,13 @@ def main() -> None:
     assert worst < 10, f"multicollinearity regression: max VIF {worst:.1f}"
     print(f"max VIF = {worst:.2f} < 10 — feature set is acceptable for linear models\n")
 
-    keep = (["Id", "listing_id", "listing_date", "is_renovated", "amenity_score"]
-            + NUMERIC_FEATURES + CATEGORICAL_FEATURES + [TARGET])
+    keep = (["Id", "listing_id", "listing_date", "sale_date",
+             "is_renovated", "amenity_score"]
+            + NUMERIC_FEATURES + CATEGORICAL_FEATURES
+            + [TARGET, MONITORING_TARGET])
     table = df[keep].copy()
     table["is_monitoring_stream"] = (
-        table["listing_date"] >= MONITORING_HOLDOUT_START).astype(int)
+        table["sale_date"] >= MONITORING_HOLDOUT_START).astype(int)
 
     table.to_csv(DATA_PROCESSED_DIR / "model_table.csv", index=False)
     n_stream = table["is_monitoring_stream"].sum()

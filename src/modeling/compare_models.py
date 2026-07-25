@@ -72,8 +72,9 @@ def residual_analysis(y_true: pd.Series, y_pred: np.ndarray, name: str) -> None:
     axes[1].axhline(0, color="red", lw=1)
     axes[1].set(xlabel="True-price decile (1=cheapest)", ylabel="Mean residual (%)",
                 title="Systematic bias by price segment")
-    fig.tight_layout()
-    fig.savefig(FIG_DIR / "08_residual_analysis.png", dpi=120)
+    fig.savefig(FIG_DIR / "08_residual_analysis.png", dpi=120,
+                bbox_inches="tight")
+    plt.close(fig)
     print(f"\nresidual bias by price decile (% of true price):")
     print(by_decile.round(1).to_string())
 
@@ -116,13 +117,18 @@ def main() -> None:
 
     best = min(results, key=lambda k: results[k]["rmse"])
     print(f"\nbest by CV RMSE: {best}")
-    residual_analysis(y, predictions[best], best)
 
     MODELS_DIR.mkdir(exist_ok=True)
     out = {"cv_folds": 5, "training_rows": len(train), "best_model": best,
            "metrics": results}
     (MODELS_DIR / "model_comparison.json").write_text(json.dumps(out, indent=2))
     print(f"\nwrote {MODELS_DIR / 'model_comparison.json'}")
+
+    try:
+        residual_analysis(y, predictions[best], best)
+    except RecursionError:
+        # matplotlib 3.x + some Python builds hit MarkerStyle deepcopy recursion
+        print("warning: residual figure skipped (matplotlib RecursionError)")
 
 
 if __name__ == "__main__":
