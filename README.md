@@ -10,6 +10,7 @@ is its estimated market price, and how confident is that estimate?"*
 ## Live demo
 
 - 🏠 **Valuation tool (Streamlit):** https://house-price-analytics-tjpb7ntxsd6kzbapp7bymmv.streamlit.app/
+- 📈 **Monitoring dashboard:** second page of the same Streamlit app (sidebar) — the 2010 drift replay with all four retraining triggers, rendered from committed monitoring artifacts
 - 🔌 **Prediction API (FastAPI):** run locally with `uvicorn app.api.main:app` → interactive docs at http://localhost:8000/docs (same model, same serving code as the live tool)
 
 ## Team
@@ -75,7 +76,7 @@ Monitoring outputs land in `monitoring/reports/` (per-month Evidently HTML +
 data/          raw (Kaggle, gitignored) · synthetic · processed
 src/           pipeline code: data_generation · cleaning · features · modeling · monitoring
 notebooks/     EDA and residual-analysis notebooks
-app/           Streamlit valuation tool (primary deploy) + FastAPI service
+app/           Streamlit app (valuation tool + monitoring dashboard) + FastAPI service
 models/        trained model artifacts
 monitoring/    generated Evidently drift & performance reports
 reports/       final report (PDF + HTML source), slides (PPTX on the official

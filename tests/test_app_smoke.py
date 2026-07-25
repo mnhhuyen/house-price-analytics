@@ -47,16 +47,40 @@ def test_empty_input_falls_back_to_typical_home_defaults(service):
     assert 100_000 < r["estimate_usd"] < 250_000
 
 
-def test_streamlit_app_renders_without_exception():
-    # Executes the actual app script (catches ordering bugs like
-    # set_page_config-not-first that a plain HTTP check misses)
+def test_valuation_tool_renders_without_exception():
+    # Executes the valuation page (catches ordering bugs like
+    # set_page_config-not-first that a plain HTTP check misses).
+    # Multipage entry point (streamlit_app.py) is a thin navigator; the
+    # pages themselves are what users see.
     from streamlit.testing.v1 import AppTest
 
     at = AppTest.from_file(str(Path(__file__).resolve().parent.parent
-                               / "app" / "streamlit_app.py"),
+                               / "app" / "valuation_tool.py"),
                            default_timeout=30).run()
-    assert not at.exception, f"app raised: {at.exception}"
+    assert not at.exception, f"page raised: {at.exception}"
     assert at.title[0].value.startswith("🏠")
+
+
+def test_monitoring_dashboard_renders_without_exception():
+    from streamlit.testing.v1 import AppTest
+
+    at = AppTest.from_file(str(Path(__file__).resolve().parent.parent
+                               / "app" / "monitoring_dashboard.py"),
+                           default_timeout=30).run()
+    assert not at.exception, f"page raised: {at.exception}"
+    assert at.title[0].value.startswith("📈")
+    # the verdict must come from the committed artifact, not a hardcoded claim
+    verdicts = [m.value for m in at.metric]
+    assert any("retrain since 2010-03" in str(v) for v in verdicts)
+
+
+def test_multipage_entry_point_has_both_pages():
+    """The deploy entry point must expose both demos in one process."""
+    src = (Path(__file__).resolve().parent.parent
+           / "app" / "streamlit_app.py").read_text()
+    assert "valuation_tool.py" in src
+    assert "monitoring_dashboard.py" in src
+    assert "st.navigation" in src
 
 
 def test_api_predict_and_health():

@@ -23,6 +23,15 @@ RANDOM_SEED = 42
 # so USD is the faithful unit (team decision, see DECISIONS.md).
 CURRENCY = "USD"
 
+# Module 7 retraining triggers — committed BEFORE the 2010 stream was replayed
+# (DECISIONS.md D16). One source of truth shared by the monitoring job
+# (src/monitoring/run_monitoring.py) and the app's monitoring dashboard page.
+RMSE_ALERT_RATIO = 1.25   # T2: rolling RMSE > 1.25 x training-baseline RMSE
+DRIFT_SHARE_ALERT = 0.30  # T1: > 30% of input features drift (Evidently)
+BIAS_ALERT_PCT = 5.0      # T3: |mean error| > 5% of the window's median price
+COVERAGE_ALERT = 0.65     # T4: observed 80%-interval coverage < 65%
+WINDOW_MONTHS = 3         # rolling window; single months hold only 6-48 sales
+
 # Time axis: anchored to the REAL sale dates in the Ames data (YrSold/MoSold,
 # Jan 2006 - Jul 2010). Synthetic macro series (interest rate, price index)
 # are overlaid on this axis. All 2010 sales (Jan-Jul, ~175 homes) are held out
